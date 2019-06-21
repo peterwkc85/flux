@@ -303,6 +303,9 @@ type Info struct {
 	// will be the same for references that point at the same image
 	// (but does not necessarily equal Docker's image ID)
 	ImageID string `json:",omitempty"`
+	// indicator if the usage of the timestamp label is whitelisted
+	// for this image
+	UseTimestampLabels bool `json:",omitempty"`
 	// all labels we are interested in and could find for the image ref
 	Labels Labels `json:",omitempty"`
 	// the time at which the image pointed at was created
@@ -353,7 +356,7 @@ func (im *Info) UnmarshalJSON(b []byte) error {
 
 // CreatedTS returns the created at timestamp for an image,
 // prioritizing user defined timestamps from labels over the ones we
-// receive from a Docker registry API.
+// receive from a Docker registry API, if the image is whitelisted.
 //
 // The reason for this is registry vendors have different
 // interpretations of what a creation  date is, and we want the user to
@@ -363,11 +366,13 @@ func (im *Info) UnmarshalJSON(b []byte) error {
 // as the Label Schema Spec has been deprecated in favour of the OCI
 // Spec (but is still well known and widely used).
 func (im Info) CreatedTS() time.Time {
-	if !im.Labels.Created.IsZero() {
-		return im.Labels.Created
-	}
-	if !im.Labels.BuildDate.IsZero() {
-		return im.Labels.BuildDate
+	if im.UseTimestampLabels {
+		if !im.Labels.Created.IsZero() {
+			return im.Labels.Created
+		}
+		if !im.Labels.BuildDate.IsZero() {
+			return im.Labels.BuildDate
+		}
 	}
 	return im.CreatedAt
 }

@@ -73,9 +73,10 @@ type ClientFactory interface {
 }
 
 type Remote struct {
-	transport http.RoundTripper
-	repo      image.CanonicalName
-	base      string
+	transport          http.RoundTripper
+	repo               image.CanonicalName
+	base               string
+	useTimestampLabels bool
 }
 
 // Adapt to docker distribution `reference.Named`.
@@ -149,6 +150,7 @@ interpret:
 		// identify the image as it's the topmost layer.
 		info.ImageID = v1.ID
 		info.CreatedAt = v1.Created
+		info.UseTimestampLabels = a.useTimestampLabels
 		info.Labels = v1.Config.Labels
 	case *schema2.DeserializedManifest:
 		var man schema2.Manifest = deserialised.Manifest
@@ -174,6 +176,7 @@ interpret:
 		// This _is_ what Docker uses as its Image ID.
 		info.ImageID = man.Config.Digest.String()
 		info.CreatedAt = config.Created
+		info.UseTimestampLabels = a.useTimestampLabels
 		info.Labels = config.ContainerConfig.Labels
 	case *manifestlist.DeserializedManifestList:
 		var list manifestlist.ManifestList = deserialised.ManifestList

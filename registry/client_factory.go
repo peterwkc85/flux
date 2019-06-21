@@ -13,6 +13,7 @@ import (
 	"github.com/docker/distribution/registry/client/auth/challenge"
 	"github.com/docker/distribution/registry/client/transport"
 	"github.com/go-kit/kit/log"
+	"github.com/ryanuber/go-glob"
 
 	"github.com/weaveworks/flux/image"
 	"github.com/weaveworks/flux/registry/middleware"
@@ -26,6 +27,8 @@ type RemoteClientFactory struct {
 	// hosts with which to tolerate insecure connections (e.g., with
 	// TLS_INSECURE_SKIP_VERIFY, or as a fallback, using HTTP).
 	InsecureHosts []string
+
+	TimestampLabelWhitelist []string
 
 	mu               sync.Mutex
 	challengeManager challenge.Manager
@@ -154,7 +157,7 @@ insecureCheckLoop:
 
 	// For the API base we want only the scheme and host.
 	registryURL.Path = ""
-	client := &Remote{transport: tx, repo: repo, base: registryURL.String()}
+	client := &Remote{transport: tx, repo: repo, base: registryURL.String(), useTimestampLabels: f.useTimestampLabels(repo)}
 	return NewInstrumentedClient(client), nil
 }
 
@@ -165,6 +168,18 @@ func (f *RemoteClientFactory) Succeed(repo image.CanonicalName) {
 	if f.Limiters != nil {
 		f.Limiters.Recover(repo.Domain)
 	}
+}
+
+func (f *RemoteClientFactory) useTimestampLabels(repo image.CanonicalName) bool {
+	for _, exp := range f.TimestampLabelWhitelist {
+		if glob.Glob(exp, repo.String()) {
+			if f.Trace {
+				f.Logger.Log("repo", repo.String(), "matched timestamp whitelist entry", exp)
+			}
+			return true
+		}
+	}
+	return false
 }
 
 // store adapts a set of pre-selected creds to be an
